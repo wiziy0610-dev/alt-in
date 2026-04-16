@@ -23,9 +23,49 @@
     .hide-scroll { overflow-x: auto; scrollbar-width: none; }
     .hide-scroll::-webkit-scrollbar { display: none; }
     .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+    /* 히어로 */
+    .hero {
+      position: relative;
+      width: 100%;
+      height: 520px;
+      overflow: hidden;
+      background: #111;
+    }
+    .hero img { width: 100%; height: 100%; object-fit: cover; opacity: 0.55; transition: opacity 0.6s; }
+    .hero-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: 3rem 3.5rem;
+      background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%);
+    }
+    @media (max-width: 768px) {
+      .hero { height: 360px; }
+      .hero-overlay { padding: 2rem 1.5rem; }
+    }
+
+    /* 카테고리 카드 */
+    .cat-card {
+      position: relative; overflow: hidden; border-radius: 6px;
+      cursor: pointer; aspect-ratio: 4/3;
+      transition: transform 0.2s;
+    }
+    .cat-card:hover { transform: translateY(-3px); }
+    .cat-card img { width: 100%; height: 100%; object-fit: cover; opacity: 0.7; transition: opacity 0.3s; }
+    .cat-card:hover img { opacity: 0.5; }
+    .cat-card-label {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: 1.2rem;
+      background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 60%);
+    }
+
+    /* 기사 행 */
     .article-row { transition: opacity 0.15s; }
     .article-row:hover { opacity: 0.65; }
-    .cat-btn { background: none; border: none; border-bottom: 2px solid transparent; padding: 0.75rem 1.5rem 0.75rem 0; font-size: 13px; font-weight: 300; color: #bbb; letter-spacing: 0.04em; white-space: nowrap; transition: color 0.15s; cursor: pointer; }
+
+    /* 탭 */
+    .cat-btn { background: none; border: none; border-bottom: 2px solid transparent; padding: 0.7rem 1.4rem 0.7rem 0; font-size: 13px; font-weight: 300; color: #bbb; letter-spacing: 0.04em; white-space: nowrap; cursor: pointer; }
     .cat-btn.active { color: #111; border-bottom-color: #111; font-weight: 500; }
   </style>
 </head>
@@ -35,68 +75,60 @@
 const { useState, useEffect, useMemo } = React;
 const NEWS_CATS = ["부동산","인프라","PE","VC"];
 
-/* ── 의미없는 요약 필터 ── */
-const BAD = ["관한 기사입니다","본문을 불러오지","링크를 클릭해","원문을 확인","자세한 내용은"];
-function cleanSummary(summary, title) {
-  if (!summary) return [];
-  return summary.filter(s => s && s.length > 15 && !BAD.some(p => s.includes(p)) && s.trim() !== title.trim());
-}
+/* ── 카테고리별 이미지 (Unsplash 무료) ── */
+const CAT_IMAGES = {
+  부동산: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80",
+  인프라:  "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=800&q=80",
+  PE:     "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&q=80",
+  VC:     "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=800&q=80",
+};
+const HERO_IMAGE = "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1600&q=80";
 
-/* ── 2주 이내 필터 ── */
-function isRecent(scraped_at) {
-  if (!scraped_at) return true;
-  try { return (Date.now() - new Date(scraped_at).getTime()) / 86400000 <= 14; }
+/* ── 필터/중복 제거 ── */
+const BAD = ["관한 기사입니다","본문을 불러오지","링크를 클릭해","원문을 확인","자세한 내용은"];
+function cleanSummary(s, t) {
+  if (!s) return [];
+  return s.filter(x => x && x.length > 15 && !BAD.some(p => x.includes(p)) && x.trim() !== t.trim());
+}
+function isRecent(d) {
+  if (!d) return true;
+  try { return (Date.now() - new Date(d).getTime()) / 86400000 <= 14; }
   catch { return true; }
 }
-
-/* ── 중복 제거: 8자 이상 공통 부분문자열 ── */
 function hasOverlap(a, b) {
-  const clean = s => s.replace(/[^\uAC00-\uD7A3a-zA-Z0-9]/g, "");
-  const sa = clean(a), sb = clean(b);
-  for (let i = 0; i <= sa.length - 8; i++) {
-    if (sb.includes(sa.slice(i, i + 8))) return true;
-  }
+  const c = s => s.replace(/[^\uAC00-\uD7A3a-zA-Z0-9]/g,"");
+  const sa = c(a), sb = c(b);
+  for (let i = 0; i <= sa.length - 8; i++) if (sb.includes(sa.slice(i,i+8))) return true;
   return false;
 }
-function dedup(articles) {
+function dedup(arr) {
   const kept = [];
-  articles.forEach(a => {
-    if (!kept.some(k => hasOverlap(k.title, a.title))) kept.push(a);
-  });
+  arr.forEach(a => { if (!kept.some(k => hasOverlap(k.title,a.title))) kept.push(a); });
   return kept;
+}
+function groupByCategory(arr) {
+  const r = {부동산:[],인프라:[],PE:[],VC:[]};
+  dedup(arr.filter(a=>isRecent(a.scraped_at))).forEach(item=>{
+    const cat=(item.category||"").trim();
+    if(r[cat]!==undefined) r[cat].push(item); else r["부동산"].push(item);
+  });
+  return r;
 }
 
 /* ── 키워드 분석 ── */
-const STOP = new Set(["있다","있는","하는","하고","으로","에서","에서의","이후","대한","통해","위한","따라","관련","지난","올해","내년","지속","기준","전년","분기","수준","규모","펀드","투자","시장","기업","운용","국내","글로벌","업계","이번","해당","계획"]);
-function extractKeywords(articles, topN = 8) {
-  const freq = {};
-  articles.forEach(a => {
-    const text = [a.title, ...(a.summary||[])].join(" ");
-    const tokens = text.match(/[가-힣]{2,6}/g) || [];
-    tokens.forEach(t => {
-      if (!STOP.has(t)) freq[t] = (freq[t]||0) + 1;
-    });
+const STOP=new Set(["있다","있는","하는","하고","으로","에서","이후","대한","통해","위한","따라","관련","지난","올해","내년","지속","기준","전년","분기","수준","규모","펀드","투자","시장","기업","운용","국내","글로벌","업계","이번","해당","계획"]);
+function extractKeywords(articles,n=8){
+  const freq={};
+  articles.forEach(a=>{
+    const text=[a.title,...(a.summary||[])].join(" ");
+    (text.match(/[가-힣]{2,6}/g)||[]).forEach(t=>{ if(!STOP.has(t)) freq[t]=(freq[t]||0)+1; });
   });
-  return Object.entries(freq)
-    .sort((a,b) => b[1]-a[1])
-    .slice(0, topN)
-    .map(([word, count]) => ({ word, count }));
+  return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([word,count])=>({word,count}));
 }
 
-/* ── 카테고리 분류 ── */
-function groupByCategory(arr) {
-  const result = { 부동산:[], 인프라:[], PE:[], VC:[] };
-  dedup(arr.filter(a => isRecent(a.scraped_at))).forEach(item => {
-    const cat = (item.category||"").trim();
-    if (result[cat] !== undefined) result[cat].push(item);
-    else result["부동산"].push(item);
-  });
-  return result;
-}
-
-/* ── 폴백 데이터 ── */
-const NOW = new Date().toISOString();
-const FALLBACK = {
+/* ── 폴백 ── */
+const NOW=new Date().toISOString();
+const FALLBACK={
   부동산:[
     {id:1,tag:"리츠",source:"한국경제",time:"2시간 전",title:"국내 리츠 시장, 2025년 공모 규모 역대 최대 전망",url:"https://www.hankyung.com",scraped_at:NOW,summary:["공모 리츠 신규 상장 규모가 전년 대비 40% 증가할 전망이다.","물류·데이터센터 특화 리츠에 기관 투자자 자금 유입이 집중되고 있다.","금리 안정화 기대감에 배당 수익률 메리트가 부각되고 있다."]},
     {id:2,tag:"오피스",source:"매일경제",time:"4시간 전",title:"서울 도심 프라임 오피스 공실률 3%대 진입… 임대료 상승 지속",url:"https://www.mk.co.kr",scraped_at:NOW,summary:["서울 도심 프라임 오피스 공실률이 3.2%로 하락하며 수급 타이트 국면이 이어지고 있다.","임대료는 전년 대비 7% 상승한 3.3만원/㎡ 수준이다."]},
@@ -116,25 +148,20 @@ const FALLBACK = {
   ],
 };
 
-/* ── 키워드 뱃지 ── */
-function KeywordBar({ articles }) {
-  const kws = useMemo(() => extractKeywords(articles), [articles]);
-  if (!kws.length) return null;
-  const max = kws[0].count;
-  return (
-    <div style={{ marginBottom:"2rem", padding:"1.25rem 1.5rem", background:"#f9f9f9", borderRadius:4 }}>
-      <p style={{ fontSize:10, fontWeight:500, color:"#aaa", letterSpacing:"0.12em", marginBottom:"0.9rem" }}>
-        최근 2주 주요 키워드
-      </p>
-      <div style={{ display:"flex", flexWrap:"wrap", gap:"0.5rem" }}>
-        {kws.map(({ word, count }) => {
-          const ratio = count / max;
-          const size  = Math.round(11 + ratio * 5);
-          const alpha = 0.35 + ratio * 0.65;
-          return (
-            <span key={word} style={{ fontSize:size, fontWeight: ratio > 0.6 ? 500 : 300, color:`rgba(17,17,17,${alpha})`, background:"#fff", border:"1px solid #e8e8e8", borderRadius:2, padding:"3px 10px", letterSpacing:"0.02em" }}>
-              {word}
-              <span style={{ fontSize:9, color:"#ccc", marginLeft:4 }}>{count}</span>
+/* ── 키워드 바 ── */
+function KeywordBar({articles}){
+  const kws=useMemo(()=>extractKeywords(articles),[articles]);
+  if(!kws.length) return null;
+  const max=kws[0].count;
+  return(
+    <div style={{marginBottom:"2rem",padding:"1.1rem 1.4rem",background:"#f7f7f7",borderRadius:4}}>
+      <p style={{fontSize:10,fontWeight:500,color:"#aaa",letterSpacing:"0.12em",marginBottom:"0.8rem"}}>최근 2주 주요 키워드</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:"0.45rem"}}>
+        {kws.map(({word,count})=>{
+          const r=count/max;
+          return(
+            <span key={word} style={{fontSize:Math.round(11+r*5),fontWeight:r>0.6?500:300,color:`rgba(17,17,17,${0.35+r*0.65})`,background:"#fff",border:"1px solid #e8e8e8",borderRadius:2,padding:"3px 10px",letterSpacing:"0.02em"}}>
+              {word}<span style={{fontSize:9,color:"#ccc",marginLeft:4}}>{count}</span>
             </span>
           );
         })}
@@ -143,29 +170,27 @@ function KeywordBar({ articles }) {
   );
 }
 
-/* ── 기사 한 줄 ── */
-function ArticleRow({ news, isScrapped, onToggle }) {
-  const summary = cleanSummary(news.summary, news.title);
-  return (
-    <div style={{ borderBottom:"1px solid #ebebeb" }}>
-      <a href={news.url} target="_blank" rel="noopener noreferrer" className="article-row" style={{ display:"block", padding:"1.75rem 0 1.25rem" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:"0.7rem" }}>
-          <span style={{ fontSize:10, fontWeight:500, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase" }}>{news.tag}</span>
-          <span style={{ width:1, height:10, background:"#ddd", display:"inline-block" }}/>
-          <span style={{ fontSize:11, color:"#bbb", fontWeight:300 }}>{news.source}</span>
-          <span style={{ fontSize:11, color:"#ccc", fontWeight:300, marginLeft:"auto" }}>{news.time}</span>
+/* ── 기사 행 ── */
+function ArticleRow({news,isScrapped,onToggle}){
+  const summary=cleanSummary(news.summary,news.title);
+  return(
+    <div style={{borderBottom:"1px solid #ebebeb"}}>
+      <a href={news.url} target="_blank" rel="noopener noreferrer" className="article-row" style={{display:"block",padding:"1.75rem 0 1.25rem"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"0.7rem"}}>
+          <span style={{fontSize:10,fontWeight:500,color:"#888",letterSpacing:"0.12em",textTransform:"uppercase"}}>{news.tag}</span>
+          <span style={{width:1,height:10,background:"#ddd",display:"inline-block"}}/>
+          <span style={{fontSize:11,color:"#bbb",fontWeight:300}}>{news.source}</span>
+          <span style={{fontSize:11,color:"#ccc",fontWeight:300,marginLeft:"auto"}}>{news.time}</span>
         </div>
-        <h3 className="serif" style={{ fontSize:"clamp(16px,2.2vw,20px)", fontWeight:700, color:"#111", lineHeight:1.65, letterSpacing:"-0.025em", marginBottom: summary.length ? "0.85rem" : 0 }}>
+        <h3 className="serif" style={{fontSize:"clamp(16px,2.2vw,20px)",fontWeight:700,color:"#111",lineHeight:1.65,letterSpacing:"-0.025em",marginBottom:summary.length?"0.8rem":0}}>
           {news.title}
         </h3>
-        {summary.length > 0 && (
-          <p style={{ fontSize:13, color:"#666", lineHeight:1.85, fontWeight:300 }}>{summary.join(" ")}</p>
-        )}
+        {summary.length>0&&<p style={{fontSize:13,color:"#666",lineHeight:1.85,fontWeight:300}}>{summary.join(" ")}</p>}
       </a>
-      <div style={{ paddingBottom:"1.25rem", display:"flex", justifyContent:"flex-end" }}>
-        <button onClick={() => onToggle(news.id)} style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, fontWeight:400, padding:"4px 12px", border:`1px solid ${isScrapped?"#111":"#ddd"}`, background:isScrapped?"#111":"transparent", color:isScrapped?"#fff":"#bbb", borderRadius:2, letterSpacing:"0.08em" }}>
+      <div style={{paddingBottom:"1.25rem",display:"flex",justifyContent:"flex-end"}}>
+        <button onClick={()=>onToggle(news.id)} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,padding:"4px 12px",border:`1px solid ${isScrapped?"#111":"#ddd"}`,background:isScrapped?"#111":"transparent",color:isScrapped?"#fff":"#bbb",borderRadius:2,letterSpacing:"0.08em"}}>
           <svg width="10" height="10" viewBox="0 0 12 12" fill={isScrapped?"white":"none"} stroke={isScrapped?"white":"#ccc"} strokeWidth="1.5"><path d="M2 2h8v9L6 8.5 2 11V2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          {isScrapped ? "저장됨" : "저장"}
+          {isScrapped?"저장됨":"저장"}
         </button>
       </div>
     </div>
@@ -173,104 +198,109 @@ function ArticleRow({ news, isScrapped, onToggle }) {
 }
 
 /* ── 설정 ── */
-function Settings() {
-  const [notif, setNotif] = useState(true);
-  const T = ({ on, fn }) => (
-    <div onClick={fn} style={{ width:38,height:20,borderRadius:10,background:on?"#111":"#e0e0e0",cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0 }}>
-      <div style={{ position:"absolute",top:2,left:on?20:2,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left .2s" }}/>
+function Settings(){
+  const [notif,setNotif]=useState(true);
+  const T=({on,fn})=>(
+    <div onClick={fn} style={{width:38,height:20,borderRadius:10,background:on?"#111":"#e0e0e0",cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}>
+      <div style={{position:"absolute",top:2,left:on?20:2,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
     </div>
   );
-  const Row = ({ label, sub, right }) => (
-    <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.1rem 0",borderBottom:"1px solid #f2f2f2" }}>
-      <div><p style={{ fontSize:14,color:"#111" }}>{label}</p>{sub&&<p style={{ fontSize:12,color:"#bbb",marginTop:2,fontWeight:300 }}>{sub}</p>}</div>
+  const Row=({label,sub,right})=>(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.1rem 0",borderBottom:"1px solid #f2f2f2"}}>
+      <div><p style={{fontSize:14,color:"#111"}}>{label}</p>{sub&&<p style={{fontSize:12,color:"#bbb",marginTop:2,fontWeight:300}}>{sub}</p>}</div>
       {right}
     </div>
   );
-  return (
-    <div style={{ maxWidth:480 }}>
-      <h2 className="serif" style={{ fontSize:28,fontWeight:700,letterSpacing:"-0.03em",marginBottom:"2rem" }}>설정</h2>
+  return(
+    <div style={{maxWidth:480}}>
+      <h2 className="serif" style={{fontSize:28,fontWeight:700,letterSpacing:"-0.03em",marginBottom:"2rem"}}>설정</h2>
       <Row label="새 기사 알림" sub="매일 오전 7시 업데이트" right={<T on={notif} fn={()=>setNotif(p=>!p)}/>}/>
       <Row label="앱 버전" sub="v1.0.0 Beta" right={<span style={{fontSize:12,color:"#ccc"}}>→</span>}/>
       <Row label="문의 / 피드백" right={<span style={{fontSize:12,color:"#ccc"}}>→</span>}/>
-      <p style={{ fontSize:11,color:"#ccc",marginTop:"2.5rem",fontWeight:300,letterSpacing:"0.08em" }}>ALTER-INFO · 대체투자 취준생을 위한 뉴스 큐레이션</p>
+      <p style={{fontSize:11,color:"#ccc",marginTop:"2.5rem",fontWeight:300,letterSpacing:"0.08em"}}>ALTER-INFO · 대체투자 취준생을 위한 뉴스 큐레이션</p>
     </div>
   );
 }
 
 /* ── 메인 ── */
-function App() {
-  const [tab,      setTab]      = useState("home");
-  const [cat,      setCat]      = useState("부동산");
-  const [scrapped, setScrapped] = useState({});
-  const [data,     setData]     = useState(FALLBACK);
-  const [loading,  setLoading]  = useState(true);
-  const [mobile,   setMobile]   = useState(window.innerWidth < 768);
+function App(){
+  const [tab,setTab]=useState("home");
+  const [cat,setCat]=useState(null); // null = 홈 랜딩
+  const [scrapped,setScrapped]=useState({});
+  const [data,setData]=useState(FALLBACK);
+  const [loading,setLoading]=useState(true);
+  const [mobile,setMobile]=useState(window.innerWidth<768);
 
-  useEffect(() => {
-    const fn = () => setMobile(window.innerWidth < 768);
-    window.addEventListener("resize", fn);
-    return () => window.removeEventListener("resize", fn);
-  }, []);
+  useEffect(()=>{
+    const fn=()=>setMobile(window.innerWidth<768);
+    window.addEventListener("resize",fn);
+    return()=>window.removeEventListener("resize",fn);
+  },[]);
 
-  useEffect(() => {
+  useEffect(()=>{
     fetch("alt_in_news.json")
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(arr => { if (arr.length > 0) setData(groupByCategory(arr)); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      .then(r=>{if(!r.ok)throw new Error();return r.json();})
+      .then(arr=>{if(arr.length>0)setData(groupByCategory(arr));})
+      .catch(()=>{})
+      .finally(()=>setLoading(false));
+  },[]);
 
-  useEffect(() => {
-    if ("serviceWorker" in navigator)
+  useEffect(()=>{
+    if("serviceWorker"in navigator)
       navigator.serviceWorker.register("service-worker.js").catch(()=>{});
-  }, []);
+  },[]);
 
-  const toggle   = id => setScrapped(p => ({ ...p, [id]: !p[id] }));
-  const allFlat  = Object.values(data).flat();
-  const scrapCnt = Object.values(scrapped).filter(Boolean).length;
-  const saved    = allFlat.filter(n => scrapped[n.id]);
-  const list     = tab === "bookmark" ? saved : (data[cat]||[]);
-  const px       = mobile ? "1.25rem" : "3.5rem";
+  const toggle=id=>setScrapped(p=>({...p,[id]:!p[id]}));
+  const allFlat=Object.values(data).flat();
+  const scrapCnt=Object.values(scrapped).filter(Boolean).length;
+  const saved=allFlat.filter(n=>scrapped[n.id]);
+  const list=tab==="bookmark"?saved:cat?(data[cat]||[]):[];
+  const px=mobile?"1.25rem":"3.5rem";
 
-  const NAV = [
-    { id:"home",     label:"홈" },
-    { id:"bookmark", label:`저장${scrapCnt>0?" ("+scrapCnt+")":""}` },
-    { id:"settings", label:"설정" },
+  const NAV=[
+    {id:"home",label:"홈"},
+    {id:"bookmark",label:`저장${scrapCnt>0?" ("+scrapCnt+")":""}`},
+    {id:"settings",label:"설정"},
   ];
 
-  return (
-    <div style={{ minHeight:"100vh", background:"#fff" }}>
+  // 홈으로 돌아가기
+  const goHome=()=>{setTab("home");setCat(null);};
+  const goCat=c=>{setTab("home");setCat(c);};
 
-      {/* 헤더 */}
-      <header style={{ borderBottom:"1.5px solid #111", position:"sticky", top:0, background:"#fff", zIndex:10 }}>
-        <div style={{ maxWidth:820, margin:"0 auto", padding:`0 ${px}` }}>
-          <div style={{ display:"flex", alignItems:"center", height:58, justifyContent:"space-between" }}>
-            <button onClick={()=>setTab("home")} style={{ display:"flex",alignItems:"baseline",gap:8,background:"none",border:"none" }}>
-              <span className="serif" style={{ fontSize:20,fontWeight:700,letterSpacing:"-0.04em",color:"#111" }}>Alter-Info</span>
-              <span style={{ fontSize:9,color:"#bbb",letterSpacing:"0.15em",fontWeight:300 }}>BETA</span>
+  const isLanding=tab==="home"&&!cat;
+
+  return(
+    <div style={{minHeight:"100vh",background:"#fff"}}>
+
+      {/* ── 헤더 ── */}
+      <header style={{borderBottom: isLanding?"none":"1.5px solid #111", position:"sticky",top:0,background: isLanding?"transparent":"#fff",zIndex:10, transition:"background 0.3s"}}>
+        <div style={{maxWidth:900,margin:"0 auto",padding:`0 ${px}`}}>
+          <div style={{display:"flex",alignItems:"center",height:58,justifyContent:"space-between"}}>
+            <button onClick={goHome} style={{display:"flex",alignItems:"baseline",gap:8,background:"none",border:"none"}}>
+              <span className="serif" style={{fontSize:20,fontWeight:700,letterSpacing:"-0.04em",color: isLanding?"#fff":"#111"}}>Alter-Info</span>
+              <span style={{fontSize:9,color: isLanding?"rgba(255,255,255,0.6)":"#bbb",letterSpacing:"0.15em",fontWeight:300}}>BETA</span>
             </button>
-            {!mobile ? (
-              <nav style={{ display:"flex", gap:32 }}>
-                {NAV.map(n => (
-                  <button key={n.id} onClick={()=>setTab(n.id)} style={{ background:"none",border:"none",fontSize:12,fontWeight:tab===n.id?500:300,color:tab===n.id?"#111":"#bbb",letterSpacing:"0.06em",paddingBottom:2,borderBottom:tab===n.id?"1.5px solid #111":"1.5px solid transparent" }}>
+            {!mobile?(
+              <nav style={{display:"flex",gap:32}}>
+                {NAV.map(n=>(
+                  <button key={n.id} onClick={()=>{setTab(n.id);if(n.id!=="home")setCat(null);}} style={{background:"none",border:"none",fontSize:12,fontWeight:tab===n.id?500:300,color: isLanding?"rgba(255,255,255,0.85)":tab===n.id?"#111":"#bbb",letterSpacing:"0.06em",paddingBottom:2,borderBottom:(!isLanding&&tab===n.id)?"1.5px solid #111":"1.5px solid transparent"}}>
                     {n.label}
                   </button>
                 ))}
               </nav>
-            ) : (
-              <div style={{ display:"flex", gap:20 }}>
-                <button onClick={()=>setTab("bookmark")} style={{ background:"none",border:"none",fontSize:12,color:tab==="bookmark"?"#111":"#bbb",fontWeight:300,position:"relative" }}>
-                  저장{scrapCnt>0&&<span style={{ position:"absolute",top:-4,right:-10,fontSize:8,background:"#111",color:"#fff",borderRadius:8,padding:"1px 4px" }}>{scrapCnt}</span>}
+            ):(
+              <div style={{display:"flex",gap:20}}>
+                <button onClick={()=>{setTab("bookmark");setCat(null);}} style={{background:"none",border:"none",fontSize:12,color: isLanding?"rgba(255,255,255,0.85)":tab==="bookmark"?"#111":"#bbb",fontWeight:300,position:"relative"}}>
+                  저장{scrapCnt>0&&<span style={{position:"absolute",top:-4,right:-10,fontSize:8,background:"#111",color:"#fff",borderRadius:8,padding:"1px 4px"}}>{scrapCnt}</span>}
                 </button>
-                <button onClick={()=>setTab("settings")} style={{ background:"none",border:"none",fontSize:12,color:tab==="settings"?"#111":"#bbb",fontWeight:300 }}>설정</button>
+                <button onClick={()=>{setTab("settings");setCat(null);}} style={{background:"none",border:"none",fontSize:12,color: isLanding?"rgba(255,255,255,0.85)":tab==="settings"?"#111":"#bbb",fontWeight:300}}>설정</button>
               </div>
             )}
-            {loading && <span style={{fontSize:10,color:"#ccc",fontWeight:300}}>업데이트 중…</span>}
           </div>
-
-          {tab==="home" && (
-            <div className="hide-scroll" style={{ display:"flex" }}>
-              {NEWS_CATS.map(c => (
+          {/* 카테고리 탭 (카테고리 선택됐을 때만) */}
+          {tab==="home"&&cat&&(
+            <div className="hide-scroll" style={{display:"flex"}}>
+              {NEWS_CATS.map(c=>(
                 <button key={c} onClick={()=>setCat(c)} className={`cat-btn${cat===c?" active":""}`}>{c}</button>
               ))}
             </div>
@@ -278,44 +308,90 @@ function App() {
         </div>
       </header>
 
-      {/* 본문 */}
-      <main style={{ maxWidth:820, margin:"0 auto", padding:`2.5rem ${px}`, paddingBottom:mobile?"5rem":"3rem" }}>
-
-        {tab==="settings" && <Settings/>}
-
-        {tab!=="settings" && (
-          <>
-            {/* 타이틀 */}
-            <div style={{ display:"flex",alignItems:"baseline",justifyContent:"space-between",paddingBottom:"1.5rem",borderBottom:"1px solid #ebebeb",marginBottom:"1.5rem" }}>
-              <h1 className="serif" style={{ fontSize:"clamp(28px,5vw,42px)",fontWeight:700,letterSpacing:"-0.04em",color:"#111" }}>
-                {tab==="bookmark" ? "저장한 기사" : cat}
+      {/* ── 홈 랜딩 (카테고리 미선택) ── */}
+      {isLanding&&(
+        <>
+          {/* 히어로 */}
+          <div className="hero" style={{marginTop:-58}}>
+            <img src={HERO_IMAGE} alt="hero" loading="eager"/>
+            <div className="hero-overlay">
+              <p style={{fontSize:12,color:"rgba(255,255,255,0.6)",letterSpacing:"0.15em",fontWeight:300,marginBottom:"0.75rem"}}>ALTERNATIVE INVESTMENT NEWS</p>
+              <h1 className="serif" style={{fontSize:"clamp(28px,5vw,52px)",fontWeight:700,color:"#fff",lineHeight:1.3,letterSpacing:"-0.03em",marginBottom:"1rem"}}>
+                대체투자의 흐름을<br/>한눈에
               </h1>
-              <span style={{ fontSize:11,color:"#ccc",fontWeight:300 }}>{list.length}건</span>
+              <p style={{fontSize:14,color:"rgba(255,255,255,0.7)",fontWeight:300,maxWidth:480}}>
+                부동산 · 인프라 · PE · VC 분야의 핵심 뉴스를 매일 큐레이션합니다
+              </p>
+            </div>
+          </div>
+
+          {/* 카테고리 카드 그리드 */}
+          <div style={{maxWidth:900,margin:"0 auto",padding:`3rem ${px}`}}>
+            <h2 className="serif" style={{fontSize:"clamp(22px,3vw,30px)",fontWeight:700,letterSpacing:"-0.03em",marginBottom:"1.5rem"}}>카테고리 탐색</h2>
+            <div style={{display:"grid",gridTemplateColumns:mobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:"1rem"}}>
+              {NEWS_CATS.map(c=>(
+                <div key={c} className="cat-card" onClick={()=>goCat(c)}>
+                  <img src={CAT_IMAGES[c]} alt={c} loading="lazy"/>
+                  <div className="cat-card-label">
+                    <p style={{fontSize:11,color:"rgba(255,255,255,0.6)",letterSpacing:"0.1em",fontWeight:300,marginBottom:4}}>{(data[c]||[]).length}건</p>
+                    <p className="serif" style={{fontSize:18,fontWeight:700,color:"#fff",letterSpacing:"-0.02em"}}>{c}</p>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* 키워드 분석 (홈 탭에서만) */}
-            {tab==="home" && list.length > 0 && <KeywordBar articles={list}/>}
-
-            {/* 빈 상태 */}
-            {tab==="bookmark" && saved.length===0 && (
-              <div style={{ paddingTop:"5rem",textAlign:"center" }}>
-                <p style={{ fontSize:13,color:"#ccc",fontWeight:300,lineHeight:2.2 }}>저장한 기사가 없어요.<br/>기사 우측 하단의 저장 버튼을 눌러보세요.</p>
+            {/* 최신 기사 미리보기 */}
+            <div style={{marginTop:"3rem"}}>
+              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:"1rem",paddingBottom:"1rem",borderBottom:"1.5px solid #111"}}>
+                <h2 className="serif" style={{fontSize:"clamp(20px,3vw,26px)",fontWeight:700,letterSpacing:"-0.03em"}}>오늘의 주요 뉴스</h2>
+                <span style={{fontSize:11,color:"#ccc",fontWeight:300}}>{loading?"업데이트 중…":`${allFlat.length}건`}</span>
               </div>
-            )}
+              {allFlat.slice(0,5).map(news=>(
+                <ArticleRow key={news.id} news={news} isScrapped={!!scrapped[news.id]} onToggle={toggle}/>
+              ))}
+              {allFlat.length>5&&(
+                <div style={{textAlign:"center",marginTop:"2rem"}}>
+                  <button onClick={()=>goCat("부동산")} style={{fontSize:13,fontWeight:400,color:"#111",background:"none",border:"1.5px solid #111",borderRadius:2,padding:"0.7rem 2.5rem",letterSpacing:"0.08em"}}>
+                    전체 기사 보기
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
-            {/* 기사 목록 */}
-            {list.map(news => (
-              <ArticleRow key={news.id} news={news} isScrapped={!!scrapped[news.id]} onToggle={toggle}/>
-            ))}
-          </>
-        )}
-      </main>
+      {/* ── 카테고리 상세 / 저장 / 설정 ── */}
+      {!isLanding&&(
+        <main style={{maxWidth:900,margin:"0 auto",padding:`2.5rem ${px}`,paddingBottom:mobile?"5rem":"3rem"}}>
+          {tab==="settings"&&<Settings/>}
+          {tab!=="settings"&&(
+            <>
+              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",paddingBottom:"1.5rem",borderBottom:"1px solid #ebebeb",marginBottom:"1.5rem"}}>
+                <h1 className="serif" style={{fontSize:"clamp(28px,5vw,42px)",fontWeight:700,letterSpacing:"-0.04em",color:"#111"}}>
+                  {tab==="bookmark"?"저장한 기사":cat}
+                </h1>
+                <span style={{fontSize:11,color:"#ccc",fontWeight:300}}>{list.length}건</span>
+              </div>
+              {tab==="home"&&cat&&list.length>0&&<KeywordBar articles={list}/>}
+              {tab==="bookmark"&&saved.length===0&&(
+                <div style={{paddingTop:"5rem",textAlign:"center"}}>
+                  <p style={{fontSize:13,color:"#ccc",fontWeight:300,lineHeight:2.2}}>저장한 기사가 없어요.<br/>기사 우측 하단의 저장 버튼을 눌러보세요.</p>
+                </div>
+              )}
+              {list.map(news=>(
+                <ArticleRow key={news.id} news={news} isScrapped={!!scrapped[news.id]} onToggle={toggle}/>
+              ))}
+            </>
+          )}
+        </main>
+      )}
 
-      {/* 모바일 하단 탭 */}
-      {mobile && (
-        <nav className="safe-bottom" style={{ position:"fixed",bottom:0,left:0,right:0,background:"#fff",borderTop:"1px solid #ebebeb",display:"flex",zIndex:20 }}>
-          {NAV.map(n => (
-            <button key={n.id} onClick={()=>setTab(n.id)} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"10px 0 8px",background:"none",border:"none",color:tab===n.id?"#111":"#ccc",fontSize:10,fontWeight:tab===n.id?500:300,letterSpacing:"0.06em" }}>
+      {/* ── 모바일 하단 탭 ── */}
+      {mobile&&(
+        <nav className="safe-bottom" style={{position:"fixed",bottom:0,left:0,right:0,background:"#fff",borderTop:"1px solid #ebebeb",display:"flex",zIndex:20}}>
+          {NAV.map(n=>(
+            <button key={n.id} onClick={()=>{setTab(n.id);if(n.id!=="home")setCat(null);else setCat(null);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"10px 0 8px",background:"none",border:"none",color:tab===n.id?"#111":"#ccc",fontSize:10,fontWeight:tab===n.id?500:300,letterSpacing:"0.06em"}}>
               {n.id==="home"&&<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 8.5L10 3l7 5.5V17a1 1 0 01-1 1H4a1 1 0 01-1-1V8.5z"/></svg>}
               {n.id==="bookmark"&&<svg width="12" height="15" viewBox="0 0 14 18" fill={tab==="bookmark"?"#111":"none"} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1 1h12v16l-6-4-6 4V1z"/></svg>}
               {n.id==="settings"&&<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="10" cy="10" r="2.5"/><path d="M10 1v2M10 17v2M1 10h2M17 10h2M3.22 3.22l1.42 1.42M15.36 15.36l1.42 1.42M3.22 16.78l1.42-1.42M15.36 4.64l1.42-1.42"/></svg>}
@@ -323,6 +399,14 @@ function App() {
             </button>
           ))}
         </nav>
+      )}
+
+      {/* 푸터 */}
+      {isLanding&&(
+        <footer style={{borderTop:"1px solid #ebebeb",padding:"2rem 3.5rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"1rem"}}>
+          <span className="serif" style={{fontSize:14,fontWeight:700,color:"#111",letterSpacing:"-0.03em"}}>Alter-Info</span>
+          <span style={{fontSize:11,color:"#ccc",fontWeight:300,letterSpacing:"0.06em"}}>© 2025 Alter-Info · 대체투자 취준생을 위한 뉴스 큐레이션</span>
+        </footer>
       )}
     </div>
   );
