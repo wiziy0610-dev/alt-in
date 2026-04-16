@@ -1,1 +1,40 @@
+name: 매일 뉴스 업데이트
 
+on:
+  schedule:
+    - cron: "0 22 * * *"  # 한국 시간 매일 오전 7시 (UTC 22:00)
+  workflow_dispatch:       # 버튼으로 수동 실행도 가능
+
+jobs:
+  scrape-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 저장소 파일 가져오기
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      # 2. 파이썬 설치
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 3. 필요한 라이브러리 설치
+      - name: 라이브러리 설치
+        run: pip install -r requirements.txt
+
+      # 4. 스크래퍼 실행 → alt_in_news.json 생성
+      - name: 뉴스 스크래핑 실행
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scraper.py
+
+      # 5. 생성된 JSON을 저장소에 저장
+      - name: 뉴스 JSON 커밋 & 푸시
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add alt_in_news.json
+          git diff --staged --quiet || git commit -m "뉴스 업데이트: $(date '+%Y-%m-%d')"
+          git push
