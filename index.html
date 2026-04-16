@@ -5,68 +5,77 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>Alt-In — 대체투자 뉴스</title>
   <link rel="manifest" href="manifest.json"/>
-  <meta name="theme-color" content="#111111"/>
+  <meta name="theme-color" content="#111"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-title" content="Alt-In"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet"/>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #111; }
-    button { font-family: inherit; }
-    .serif { font-family: 'Noto Serif KR', serif; }
-    .tab-scroll { overflow-x: auto; display: flex; scrollbar-width: none; }
-    .tab-scroll::-webkit-scrollbar { display: none; }
-    .bottom-bar { padding-bottom: env(safe-area-inset-bottom); }
+    html { font-size: 16px; }
+    body { font-family: 'Noto Sans KR', sans-serif; background: #fff; color: #111; -webkit-font-smoothing: antialiased; }
+    button { font-family: inherit; cursor: pointer; }
     a { text-decoration: none; color: inherit; }
-    a:hover { opacity: 0.7; }
+    .serif { font-family: 'Noto Serif KR', serif; }
+    .hide-scroll { overflow-x: auto; scrollbar-width: none; }
+    .hide-scroll::-webkit-scrollbar { display: none; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+    /* 카드 호버 */
+    .article-row { transition: opacity 0.15s; }
+    .article-row:hover { opacity: 0.65; }
+
+    /* 탭 버튼 */
+    .cat-btn { background: none; border: none; border-bottom: 2px solid transparent; padding: 0.75rem 1.5rem 0.75rem 0; font-size: 13px; font-weight: 300; color: #bbb; letter-spacing: 0.04em; white-space: nowrap; transition: color 0.15s; }
+    .cat-btn.active { color: #111; border-bottom-color: #111; font-weight: 500; }
   </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect } = React;
-
-const TAG_COLORS = {
-  리츠:    "#1a4a8a", 오피스: "#2d6a4f", 물류:   "#7b4f1e",
-  에너지:  "#1a6a5a", 교통:   "#4a3a8a", 디지털: "#1a4a8a",
-  바이아웃:"#7b4f1e", 엑시트: "#7a2040", 세컨더리:"#4a3a8a",
-  펀드결성:"#2d6a4f", 바이오: "#1a6a5a", AI:     "#1a4a8a",
-  대체투자:"#555",
-};
-
 const NEWS_CATS = ["부동산","인프라","PE","VC"];
 
-const FALLBACK = {
-  부동산:[
-    {id:1,tag:"리츠",source:"한국경제",time:"2시간 전",title:"국내 리츠 시장, 2025년 공모 규모 역대 최대 전망",url:"https://www.hankyung.com",summary:["공모 리츠 신규 상장 규모가 전년 대비 40% 증가할 전망이다.","물류·데이터센터 특화 리츠에 기관 투자자 자금 유입이 집중되고 있다.","금리 안정화 기대감에 배당 수익률 메리트가 부각되고 있다."]},
-    {id:2,tag:"오피스",source:"매일경제",time:"4시간 전",title:"서울 도심 프라임 오피스 공실률 3%대 진입… 임대료 상승 지속",url:"https://www.mk.co.kr",summary:["서울 도심 프라임 오피스 공실률이 3.2%로 하락하며 수급 타이트 국면이 이어지고 있다.","글로벌 IB 및 외국계 법인의 확장 이전 수요가 공실 감소를 주도하고 있다.","임대료는 전년 대비 7% 상승한 3.3만원/㎡ 수준이다."]},
-    {id:3,tag:"물류",source:"조선비즈",time:"6시간 전",title:"수도권 물류센터 투자, 이커머스 수요 둔화에도 견조",url:"https://biz.chosun.com",summary:["콜드체인·라스트마일 특화 물류시설에 대한 기관 매입 수요는 꾸준하다.","수도권 3기 신도시 인근 입지를 중심으로 신규 개발 딜이 활발히 구성되고 있다.","Cap Rate는 5.2~5.8% 수준으로 유지되고 있다."]},
-  ],
-  인프라:[
-    {id:4,tag:"에너지",source:"에너지경제",time:"1시간 전",title:"해상풍력 인프라 투자 확대… 기관 PF 구성 본격화",url:"https://www.energy-news.co.kr",summary:["서남해·동해 해상풍력 프로젝트에 연기금·공제회 자금이 유입되고 있다.","선순위 대출 금리는 CD+180~200bp 수준에서 결정되는 추세다.","해외 인프라 펀드와 국내 기관이 공동 GP로 참여하는 구조가 늘어나고 있다."]},
-    {id:5,tag:"교통",source:"파이낸셜뉴스",time:"3시간 전",title:"GTX-B 노선 민간투자 재구조화… 수익률 협상 막바지",url:"https://www.fnnews.com",summary:["GTX-B 민간사업자와 국토부 간 수익률 조정 협상이 최종 단계에 돌입했다.","IRR 목표치를 두고 5.5% vs 6.0% 수준에서 줄다리기가 이어지고 있다.","총 사업비 4.3조 원 규모의 딜이 본격 확정될 전망이다."]},
-    {id:6,tag:"디지털",source:"블로터",time:"5시간 전",title:"데이터센터 인프라, 대체투자 핵심 자산으로 급부상",url:"https://www.bloter.net",summary:["하이퍼스케일 데이터센터가 글로벌 인프라 펀드의 최우선 투자 대상으로 자리 잡았다.","경기 북부·인천 지역 중심으로 외국계 운용사의 그린필드 개발이 본격화되고 있다.","전력 인프라 확보 및 인허가 리스크가 주요 병목으로 꼽힌다."]},
-  ],
-  PE:[
-    {id:7,tag:"바이아웃",source:"딜사이트",time:"30분 전",title:"국내 대형 PE, 2.5조 원 규모 블라인드 펀드 결성 완료",url:"https://dealsite.co.kr",summary:["IMM프라이빗에쿼티가 국내 PE 역사상 최대 규모 바이아웃 블라인드 펀드를 클로징했다.","국민연금·사학연금 등 국내 연기금이 앵커 LP로 참여했다.","헬스케어·소비재·B2B 서비스 섹터 중심으로 포트폴리오 구성이 시작될 전망이다."]},
-    {id:8,tag:"엑시트",source:"더벨",time:"2시간 전",title:"PE 보유 제조 포트폴리오 IPO 재추진… 밸류에이션 관건",url:"https://thebell.co.kr",summary:["정밀부품 제조사의 코스피 IPO를 2025년 하반기 재추진한다.","EV/EBITDA 12~14배 밸류에이션을 목표로 한다.","수요예측 일정은 9월로 잠정 계획됐다."]},
-    {id:9,tag:"세컨더리",source:"한국경제",time:"7시간 전",title:"글로벌 세컨더리 시장 역대 최대… 국내 운용사도 진출 타진",url:"https://www.hankyung.com",summary:["글로벌 PE 세컨더리 거래 규모가 1,600억 달러를 돌파하며 사상 최고치를 경신했다.","GP-led 컨티뉴에이션 펀드 거래 비중이 전체의 45%까지 확대됐다.","국내 운용사들도 세컨더리 전략 펀드 결성을 준비 중이다."]},
-  ],
-  VC:[
-    {id:10,tag:"AI",source:"스타트업투데이",time:"1시간 전",title:"AI 스타트업 투자 열기 지속… 시드 밸류에이션 고평가 우려",url:"https://startuptoday.co.kr",summary:["국내 AI 스타트업 시드 라운드 평균 밸류에이션이 전년 대비 60% 상승했다.","일부 VC는 포트폴리오 쏠림에 대한 내부 경고를 발령하고 있다.","글로벌 헤지펀드의 브릿지 투자 참여 증가로 시장 과열 신호가 감지된다."]},
-    {id:11,tag:"펀드결성",source:"벤처스퀘어",time:"4시간 전",title:"모태펀드 출자 사업 공고… 총 5,200억 원 규모",url:"https://www.venturesquare.net",summary:["한국벤처투자가 총 5,200억 원 출자 계획을 밝혔다.","딥테크·바이오·소부장 분야 특화 GP에 가점을 부여하는 방식으로 선발 기준이 강화됐다.","출자 신청 마감은 5월 말이며 최종 선정 결과는 7월 중 공지될 예정이다."]},
-    {id:12,tag:"바이오",source:"바이오스펙테이터",time:"6시간 전",title:"K-바이오 스타트업, 글로벌 VC 후속 투자 유치 잇따라",url:"https://www.biospectator.com",summary:["항체·세포치료제 스타트업 3개사가 글로벌 헬스케어 VC로부터 시리즈B·C를 클로징했다.","M&A를 통한 글로벌 빅파마 엑시트 전략이 주목받고 있다.","FDA 임상 1상 승인 파이프라인 보유 기업에 프리미엄 밸류에이션이 집중되고 있다."]},
-  ],
-};
+/* ── 의미없는 요약 필터 ── */
+const BAD_PATTERNS = ["관한 기사입니다","본문을 불러오지","링크를 클릭해","원문을 확인","자세한 내용은","기사입니다"];
+function cleanSummary(summary, title) {
+  if (!summary) return [];
+  return summary.filter(s =>
+    s && s.length > 15 &&
+    !BAD_PATTERNS.some(p => s.includes(p)) &&
+    s.trim() !== title.trim()
+  );
+}
 
+/* ── 2주 이내 기사 필터 ── */
+function isRecent(scraped_at) {
+  if (!scraped_at) return true;
+  try {
+    const diff = (Date.now() - new Date(scraped_at).getTime()) / (1000 * 60 * 60 * 24);
+    return diff <= 14;
+  } catch { return true; }
+}
+
+/* ── 중복 제거 (제목 유사도 기반) ── */
+function dedup(articles) {
+  const seen = [];
+  return articles.filter(a => {
+    const t = a.title.replace(/[^\uAC00-\uD7A3a-zA-Z0-9]/g, "").slice(0, 18);
+    if (seen.includes(t)) return false;
+    seen.push(t);
+    return true;
+  });
+}
+
+/* ── 카테고리 분류 ── */
 function groupByCategory(arr) {
   const result = { 부동산:[], 인프라:[], PE:[], VC:[] };
-  arr.forEach(item => {
+  const recent = arr.filter(a => isRecent(a.scraped_at));
+  dedup(recent).forEach(item => {
     const cat = (item.category||"").trim();
     if (result[cat] !== undefined) result[cat].push(item);
     else result["부동산"].push(item);
@@ -74,52 +83,60 @@ function groupByCategory(arr) {
   return result;
 }
 
-// 의미없는 요약 필터링
-function cleanSummary(summary, title) {
-  if (!summary) return [];
-  return summary.filter(s =>
-    s && s.length > 10 &&
-    !s.includes("관한 기사입니다") &&
-    !s.includes("본문을 불러오지") &&
-    !s.includes("링크를 클릭해") &&
-    !s.includes("원문을 확인하세요") &&
-    !s.includes("자세한 내용은") &&
-    s !== title
-  );
-}
+/* ── 폴백 데이터 ── */
+const FALLBACK = {
+  부동산:[
+    {id:1,tag:"리츠",source:"한국경제",time:"2시간 전",title:"국내 리츠 시장, 2025년 공모 규모 역대 최대 전망",url:"https://www.hankyung.com",scraped_at:new Date().toISOString(),summary:["공모 리츠 신규 상장 규모가 전년 대비 40% 증가할 전망이다.","물류·데이터센터 특화 리츠에 기관 투자자 자금 유입이 집중되고 있다.","금리 안정화 기대감에 배당 수익률 메리트가 부각되고 있다."]},
+    {id:2,tag:"오피스",source:"매일경제",time:"4시간 전",title:"서울 도심 프라임 오피스 공실률 3%대 진입… 임대료 상승 지속",url:"https://www.mk.co.kr",scraped_at:new Date().toISOString(),summary:["서울 도심 프라임 오피스 공실률이 3.2%로 하락하며 수급 타이트 국면이 이어지고 있다.","임대료는 전년 대비 7% 상승한 3.3만원/㎡ 수준이다."]},
+  ],
+  인프라:[
+    {id:4,tag:"에너지",source:"에너지경제",time:"1시간 전",title:"해상풍력 인프라 투자 확대… 기관 PF 구성 본격화",url:"https://www.energy-news.co.kr",scraped_at:new Date().toISOString(),summary:["서남해·동해 해상풍력 프로젝트에 연기금·공제회 자금이 유입되고 있다.","선순위 대출 금리는 CD+180~200bp 수준에서 결정되는 추세다."]},
+    {id:5,tag:"교통",source:"파이낸셜뉴스",time:"3시간 전",title:"GTX-B 노선 민간투자 재구조화… 수익률 협상 막바지",url:"https://www.fnnews.com",scraped_at:new Date().toISOString(),summary:["GTX-B 민간사업자와 국토부 간 수익률 조정 협상이 최종 단계에 돌입했다.","총 사업비 4.3조 원 규모의 딜이 본격 확정될 전망이다."]},
+  ],
+  PE:[
+    {id:7,tag:"바이아웃",source:"딜사이트",time:"30분 전",title:"국내 대형 PE, 2.5조 원 규모 블라인드 펀드 결성 완료",url:"https://dealsite.co.kr",scraped_at:new Date().toISOString(),summary:["IMM프라이빗에쿼티가 국내 PE 역사상 최대 규모 바이아웃 블라인드 펀드를 클로징했다.","헬스케어·소비재·B2B 서비스 섹터 중심으로 포트폴리오 구성이 시작될 전망이다."]},
+    {id:8,tag:"엑시트",source:"더벨",time:"2시간 전",title:"PE 보유 제조 포트폴리오 IPO 재추진… 밸류에이션 관건",url:"https://thebell.co.kr",scraped_at:new Date().toISOString(),summary:["정밀부품 제조사의 코스피 IPO를 2025년 하반기 재추진한다.","EV/EBITDA 12~14배 밸류에이션을 목표로 한다."]},
+  ],
+  VC:[
+    {id:10,tag:"AI",source:"스타트업투데이",time:"1시간 전",title:"AI 스타트업 투자 열기 지속… 시드 밸류에이션 고평가 우려",url:"https://startuptoday.co.kr",scraped_at:new Date().toISOString(),summary:["국내 AI 스타트업 시드 라운드 평균 밸류에이션이 전년 대비 60% 상승했다.","글로벌 헤지펀드의 브릿지 투자 참여 증가로 시장 과열 신호가 감지된다."]},
+    {id:11,tag:"펀드결성",source:"벤처스퀘어",time:"4시간 전",title:"모태펀드 출자 사업 공고… 총 5,200억 원 규모",url:"https://www.venturesquare.net",scraped_at:new Date().toISOString(),summary:["한국벤처투자가 총 5,200억 원 출자 계획을 밝혔다.","딥테크·바이오·소부장 분야 특화 GP에 가점을 부여하는 방식으로 선발 기준이 강화됐다."]},
+  ],
+};
 
-/* ── 뉴스 카드 ── */
-function NewsCard({ news, isScrapped, onToggle }) {
-  const tagColor = TAG_COLORS[news.tag] || "#555";
+/* ── 기사 한 줄 ── */
+function ArticleRow({ news, isScrapped, onToggle }) {
   const summary = cleanSummary(news.summary, news.title);
-
   return (
-    <div style={{ borderTop:"1px solid #e8e8e8", padding:"2rem 0", cursor:"pointer" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"0.75rem" }}>
-        <span style={{ fontSize:11, fontWeight:500, color:tagColor, letterSpacing:"0.08em", textTransform:"uppercase", border:`1px solid ${tagColor}`, borderRadius:2, padding:"2px 8px" }}>{news.tag}</span>
-        <span style={{ fontSize:12, color:"#999", fontWeight:300 }}>{news.source} · {news.time}</span>
-      </div>
+    <div style={{ borderBottom:"1px solid #ebebeb" }}>
+      <a href={news.url} target="_blank" rel="noopener noreferrer" className="article-row" style={{ display:"block", padding:"2rem 0 1.5rem" }}>
+        {/* 메타 */}
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:"0.8rem" }}>
+          <span style={{ fontSize:10, fontWeight:500, color:"#888", letterSpacing:"0.12em", textTransform:"uppercase" }}>{news.tag}</span>
+          <span style={{ width:1, height:10, background:"#ddd", display:"inline-block" }}/>
+          <span style={{ fontSize:11, color:"#bbb", fontWeight:300 }}>{news.source}</span>
+          <span style={{ fontSize:11, color:"#ccc", fontWeight:300, marginLeft:"auto" }}>{news.time}</span>
+        </div>
 
-      <a href={news.url} target="_blank" rel="noopener noreferrer">
-        <h3 className="serif" style={{ fontSize:"clamp(16px, 2.5vw, 20px)", fontWeight:600, color:"#111", lineHeight:1.6, marginBottom: summary.length ? "1rem" : 0, letterSpacing:"-0.02em" }}>
+        {/* 제목 */}
+        <h3 className="serif" style={{ fontSize:"clamp(17px,2.2vw,21px)", fontWeight:700, color:"#111", lineHeight:1.65, letterSpacing:"-0.025em", marginBottom: summary.length ? "1rem" : 0 }}>
           {news.title}
         </h3>
+
+        {/* 요약 */}
+        {summary.length > 0 && (
+          <p style={{ fontSize:13, color:"#666", lineHeight:1.85, fontWeight:300 }}>
+            {summary.join(" ")}
+          </p>
+        )}
       </a>
 
-      {summary.length > 0 && (
-        <ul style={{ listStyle:"none", display:"flex", flexDirection:"column", gap:"0.4rem", marginBottom:"1.25rem" }}>
-          {summary.map((line, i) => (
-            <li key={i} style={{ display:"flex", gap:10, fontSize:13, color:"#555", lineHeight:1.7, fontWeight:300 }}>
-              <span style={{ flexShrink:0, marginTop:7, width:3, height:3, borderRadius:"50%", background:"#bbb", display:"inline-block" }}/>
-              <span>{line}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div style={{ display:"flex", justifyContent:"flex-end" }}>
-        <button onClick={() => onToggle(news.id)} style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, fontWeight:400, padding:"5px 14px", borderRadius:2, border: isScrapped ? "1px solid #111" : "1px solid #ddd", background: isScrapped ? "#111" : "transparent", color: isScrapped ? "#fff" : "#999", cursor:"pointer", letterSpacing:"0.05em" }}>
-          <svg width="11" height="11" viewBox="0 0 12 12" fill={isScrapped?"white":"none"} stroke={isScrapped?"white":"#aaa"} strokeWidth="1.5"><path d="M2 2h8v9L6 8.5 2 11V2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      {/* 저장 버튼 */}
+      <div style={{ paddingBottom:"1.25rem", display:"flex", justifyContent:"flex-end" }}>
+        <button
+          onClick={() => onToggle(news.id)}
+          style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, fontWeight:400, padding:"4px 12px", border:`1px solid ${isScrapped?"#111":"#ddd"}`, background: isScrapped?"#111":"transparent", color: isScrapped?"#fff":"#bbb", borderRadius:2, letterSpacing:"0.08em" }}
+        >
+          <svg width="10" height="10" viewBox="0 0 12 12" fill={isScrapped?"white":"none"} stroke={isScrapped?"white":"#ccc"} strokeWidth="1.5"><path d="M2 2h8v9L6 8.5 2 11V2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
           {isScrapped ? "저장됨" : "저장"}
         </button>
       </div>
@@ -127,44 +144,42 @@ function NewsCard({ news, isScrapped, onToggle }) {
   );
 }
 
-/* ── 설정 화면 ── */
-function SettingsScreen() {
+/* ── 설정 ── */
+function Settings() {
   const [notif, setNotif] = useState(true);
-  const Toggle = ({ on, onToggle }) => (
-    <div onClick={onToggle} style={{ width:40, height:22, borderRadius:11, background:on?"#111":"#ddd", cursor:"pointer", position:"relative", transition:"background 0.2s", flexShrink:0 }}>
-      <div style={{ position:"absolute", top:3, left:on?21:3, width:16, height:16, borderRadius:"50%", background:"white", transition:"left 0.2s" }}/>
+  const T = ({ on, fn }) => (
+    <div onClick={fn} style={{ width:38,height:20,borderRadius:10,background:on?"#111":"#e0e0e0",cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0 }}>
+      <div style={{ position:"absolute",top:2,left:on?20:2,width:16,height:16,borderRadius:"50%",background:"#fff",transition:"left .2s" }}/>
     </div>
   );
-  const Row = ({ label, sub, children }) => (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"1.1rem 0", borderBottom:"1px solid #f0f0f0" }}>
-      <div>
-        <p style={{ fontSize:14, color:"#111", fontWeight:400 }}>{label}</p>
-        {sub && <p style={{ fontSize:12, color:"#aaa", marginTop:2, fontWeight:300 }}>{sub}</p>}
-      </div>
-      {children}
+  const Row = ({ label, sub, right }) => (
+    <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"1.1rem 0",borderBottom:"1px solid #f2f2f2" }}>
+      <div><p style={{ fontSize:14,color:"#111",fontWeight:400 }}>{label}</p>{sub&&<p style={{ fontSize:12,color:"#bbb",marginTop:2,fontWeight:300 }}>{sub}</p>}</div>
+      {right}
     </div>
   );
   return (
     <div style={{ maxWidth:480 }}>
-      <Row label="새 기사 알림" sub="매일 오전 7시 업데이트"><Toggle on={notif} onToggle={()=>setNotif(p=>!p)}/></Row>
-      <Row label="앱 버전" sub="v1.0.0 Beta"><span style={{fontSize:12,color:"#ccc"}}>→</span></Row>
-      <Row label="문의 / 피드백"><span style={{fontSize:12,color:"#ccc"}}>→</span></Row>
-      <p style={{ fontSize:12, color:"#ccc", marginTop:"2rem", fontWeight:300, letterSpacing:"0.05em" }}>ALT-IN · 대체투자 취준생을 위한 뉴스 큐레이션</p>
+      <h2 className="serif" style={{ fontSize:28,fontWeight:700,color:"#111",marginBottom:"2rem",letterSpacing:"-0.03em" }}>설정</h2>
+      <Row label="새 기사 알림" sub="매일 오전 7시 업데이트" right={<T on={notif} fn={()=>setNotif(p=>!p)}/>}/>
+      <Row label="앱 버전" sub="v1.0.0 Beta" right={<span style={{fontSize:12,color:"#ccc"}}>→</span>}/>
+      <Row label="문의 / 피드백" right={<span style={{fontSize:12,color:"#ccc"}}>→</span>}/>
+      <p style={{ fontSize:11,color:"#ccc",marginTop:"2.5rem",fontWeight:300,letterSpacing:"0.08em" }}>ALT-IN · 대체투자 취준생을 위한 뉴스 큐레이션</p>
     </div>
   );
 }
 
 /* ── 메인 ── */
 function App() {
-  const [bottomTab, setBottomTab] = useState("home");
-  const [newsTab,   setNewsTab]   = useState("부동산");
-  const [scrapped,  setScrapped]  = useState({});
-  const [newsData,  setNewsData]  = useState(FALLBACK);
-  const [loading,   setLoading]   = useState(true);
-  const [isMobile,  setIsMobile]  = useState(window.innerWidth < 768);
+  const [tab,      setTab]      = useState("home");
+  const [cat,      setCat]      = useState("부동산");
+  const [scrapped, setScrapped] = useState({});
+  const [data,     setData]     = useState(FALLBACK);
+  const [loading,  setLoading]  = useState(true);
+  const [mobile,   setMobile]   = useState(window.innerWidth < 768);
 
   useEffect(() => {
-    const fn = () => setIsMobile(window.innerWidth < 768);
+    const fn = () => setMobile(window.innerWidth < 768);
     window.addEventListener("resize", fn);
     return () => window.removeEventListener("resize", fn);
   }, []);
@@ -172,7 +187,7 @@ function App() {
   useEffect(() => {
     fetch("alt_in_news.json")
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(arr => { if (arr.length > 0) setNewsData(groupByCategory(arr)); })
+      .then(arr => { if (arr.length > 0) setData(groupByCategory(arr)); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -183,100 +198,106 @@ function App() {
   }, []);
 
   const toggle = id => setScrapped(p => ({ ...p, [id]: !p[id] }));
-  const allFlat      = Object.values(newsData).flat();
-  const scrapCount   = Object.values(scrapped).filter(Boolean).length;
-  const scrappedNews = allFlat.filter(n => scrapped[n.id]);
-  const displayNews  = bottomTab === "bookmark" ? scrappedNews : (newsData[newsTab]||[]);
+  const allFlat  = Object.values(data).flat();
+  const scrapCnt = Object.values(scrapped).filter(Boolean).length;
+  const saved    = allFlat.filter(n => scrapped[n.id]);
+  const list     = tab === "bookmark" ? saved : (data[cat]||[]);
+  const px       = mobile ? "1.25rem" : "3.5rem";
+  const maxW     = 820;
 
-  const TABS = [
+  const NAV = [
     { id:"home",     label:"홈" },
-    { id:"bookmark", label:"저장" },
+    { id:"bookmark", label:`저장${scrapCnt>0?" ("+scrapCnt+")":""}` },
     { id:"settings", label:"설정" },
   ];
-
-  const px = isMobile ? "1.25rem" : "3rem";
 
   return (
     <div style={{ minHeight:"100vh", background:"#fff" }}>
 
-      {/* 헤더 */}
-      <header style={{ borderBottom:"1px solid #111", position:"sticky", top:0, background:"#fff", zIndex:10 }}>
-        <div style={{ maxWidth:900, margin:"0 auto", padding:`0 ${px}`, display:"flex", alignItems:"center", justifyContent:"space-between", height:56 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <span className="serif" style={{ fontSize:20, fontWeight:600, letterSpacing:"-0.03em", color:"#111" }}>Alt-In</span>
-            <span style={{ fontSize:10, color:"#aaa", letterSpacing:"0.1em", fontWeight:300 }}>BETA</span>
-          </div>
-          {!isMobile && (
-            <nav style={{ display:"flex", gap:28 }}>
-              {TABS.map(t => (
-                <button key={t.id} onClick={()=>setBottomTab(t.id)} style={{ fontSize:13, fontWeight: bottomTab===t.id ? 500 : 300, color: bottomTab===t.id ? "#111" : "#aaa", background:"none", border:"none", cursor:"pointer", letterSpacing:"0.05em", position:"relative", paddingBottom:2, borderBottom: bottomTab===t.id ? "1px solid #111" : "none" }}>
-                  {t.label}{t.id==="bookmark" && scrapCount>0 && ` (${scrapCount})`}
-                </button>
-              ))}
-            </nav>
-          )}
-          {loading && <span style={{fontSize:11,color:"#ccc",fontWeight:300}}>업데이트 중…</span>}
-        </div>
+      {/* ── 헤더 ── */}
+      <header style={{ borderBottom:"1.5px solid #111", position:"sticky", top:0, background:"#fff", zIndex:10 }}>
+        <div style={{ maxWidth:maxW, margin:"0 auto", padding:`0 ${px}` }}>
+          <div style={{ display:"flex", alignItems:"center", height:58, justifyContent:"space-between" }}>
+            {/* 로고 */}
+            <button onClick={()=>setTab("home")} style={{ display:"flex",alignItems:"baseline",gap:8,background:"none",border:"none" }}>
+              <span className="serif" style={{ fontSize:22,fontWeight:700,letterSpacing:"-0.04em",color:"#111" }}>Alt-In</span>
+              <span style={{ fontSize:9,color:"#bbb",letterSpacing:"0.15em",fontWeight:300 }}>BETA</span>
+            </button>
 
-        {/* 카테고리 탭 */}
-        {bottomTab==="home" && (
-          <div style={{ maxWidth:900, margin:"0 auto", padding:`0 ${px}` }}>
-            <div className="tab-scroll" style={{ gap:0 }}>
-              {NEWS_CATS.map(cat => (
-                <button key={cat} onClick={()=>setNewsTab(cat)} style={{ padding:"0.6rem 1.2rem 0.6rem 0", fontSize:13, fontWeight: newsTab===cat ? 500 : 300, color: newsTab===cat ? "#111" : "#bbb", background:"none", border:"none", borderBottom: newsTab===cat ? "2px solid #111" : "2px solid transparent", cursor:"pointer", whiteSpace:"nowrap", letterSpacing:"0.03em" }}>
-                  {cat}
+            {/* 우측 네비 */}
+            {!mobile ? (
+              <nav style={{ display:"flex", gap:32 }}>
+                {NAV.map(n => (
+                  <button key={n.id} onClick={()=>setTab(n.id)} style={{ background:"none",border:"none",fontSize:12,fontWeight:tab===n.id?500:300,color:tab===n.id?"#111":"#bbb",letterSpacing:"0.06em",paddingBottom:2,borderBottom:tab===n.id?"1.5px solid #111":"1.5px solid transparent" }}>
+                    {n.label}
+                  </button>
+                ))}
+              </nav>
+            ) : (
+              <div style={{ display:"flex", gap:20 }}>
+                <button onClick={()=>setTab("bookmark")} style={{ background:"none",border:"none",fontSize:12,color:tab==="bookmark"?"#111":"#bbb",fontWeight:300,position:"relative" }}>
+                  저장{scrapCnt>0&&<span style={{ position:"absolute",top:-4,right:-10,fontSize:8,background:"#111",color:"#fff",borderRadius:8,padding:"1px 4px" }}>{scrapCnt}</span>}
                 </button>
+                <button onClick={()=>setTab("settings")} style={{ background:"none",border:"none",fontSize:12,color:tab==="settings"?"#111":"#bbb",fontWeight:300 }}>설정</button>
+              </div>
+            )}
+          </div>
+
+          {/* 카테고리 탭 */}
+          {tab==="home" && (
+            <div className="hide-scroll" style={{ display:"flex" }}>
+              {NEWS_CATS.map(c => (
+                <button key={c} onClick={()=>setCat(c)} className={`cat-btn${cat===c?" active":""}`}>{c}</button>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
-      {/* 본문 */}
-      <main style={{ maxWidth:900, margin:"0 auto", padding:`2rem ${px}`, paddingBottom: isMobile ? "80px" : "3rem" }}>
+      {/* ── 본문 ── */}
+      <main style={{ maxWidth:maxW, margin:"0 auto", padding:`2.5rem ${px}`, paddingBottom: mobile?"5rem":"3rem" }}>
 
-        {bottomTab==="settings" && <SettingsScreen/>}
+        {tab==="settings" && <Settings/>}
 
-        {bottomTab!=="settings" && (
+        {tab!=="settings" && (
           <>
-            {/* 섹션 헤더 */}
-            <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:"0.5rem" }}>
-              <h2 className="serif" style={{ fontSize:"clamp(22px, 4vw, 32px)", fontWeight:600, color:"#111", letterSpacing:"-0.03em" }}>
-                {bottomTab==="bookmark" ? "저장한 기사" : `${newsTab}`}
-              </h2>
-              <span style={{ fontSize:12, color:"#bbb", fontWeight:300 }}>{displayNews.length}건</span>
+            {/* 페이지 타이틀 */}
+            <div style={{ display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:"0.25rem",paddingBottom:"1.5rem",borderBottom:"1px solid #ebebeb" }}>
+              <h1 className="serif" style={{ fontSize:"clamp(28px,5vw,42px)",fontWeight:700,letterSpacing:"-0.04em",color:"#111" }}>
+                {tab==="bookmark" ? "저장한 기사" : cat}
+              </h1>
+              <span style={{ fontSize:11,color:"#ccc",fontWeight:300 }}>
+                {loading ? "업데이트 중…" : `${list.length}건`}
+              </span>
             </div>
 
-            {/* 북마크 빈 상태 */}
-            {bottomTab==="bookmark" && scrappedNews.length===0 && (
-              <div style={{ paddingTop:"4rem", textAlign:"center" }}>
-                <p style={{ fontSize:14, color:"#ccc", fontWeight:300, lineHeight:2 }}>저장한 기사가 없어요.<br/>기사 카드 우측 하단의 저장 버튼을 눌러보세요.</p>
+            {/* 빈 상태 */}
+            {tab==="bookmark" && saved.length===0 && (
+              <div style={{ paddingTop:"5rem",textAlign:"center" }}>
+                <p style={{ fontSize:13,color:"#ccc",fontWeight:300,lineHeight:2.2 }}>저장한 기사가 없어요.<br/>기사 우측 하단의 저장 버튼을 눌러보세요.</p>
               </div>
             )}
 
-            {/* 카드 목록 */}
-            <div>
-              {displayNews.map(news => (
-                <NewsCard key={news.id} news={news} isScrapped={!!scrapped[news.id]} onToggle={toggle}/>
-              ))}
-            </div>
+            {/* 기사 목록 */}
+            {list.map(news => (
+              <ArticleRow key={news.id} news={news} isScrapped={!!scrapped[news.id]} onToggle={toggle}/>
+            ))}
           </>
         )}
       </main>
 
-      {/* 모바일 하단 탭 */}
-      {isMobile && (
-        <div className="bottom-bar" style={{ position:"fixed", bottom:0, left:0, right:0, background:"#fff", borderTop:"1px solid #e8e8e8", display:"flex", zIndex:20 }}>
-          {TABS.map(({ id, label }) => (
-            <button key={id} onClick={()=>setBottomTab(id)} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2, padding:"10px 0 8px", background:"none", border:"none", cursor:"pointer", color: id===bottomTab?"#111":"#bbb", fontSize:11, fontWeight: id===bottomTab?500:300, letterSpacing:"0.05em", position:"relative" }}>
-              {label}
-              {id==="bookmark" && scrapCount>0 && (
-                <span style={{ position:"absolute", top:6, right:"25%", fontSize:8, fontWeight:500, background:"#111", color:"white", borderRadius:10, padding:"1px 4px" }}>{scrapCount}</span>
-              )}
-              {id===bottomTab && <div style={{ width:4, height:4, borderRadius:"50%", background:"#111" }}/>}
+      {/* ── 모바일 하단 탭 ── */}
+      {mobile && (
+        <nav className="safe-bottom" style={{ position:"fixed",bottom:0,left:0,right:0,background:"#fff",borderTop:"1px solid #ebebeb",display:"flex",zIndex:20 }}>
+          {NAV.map(n => (
+            <button key={n.id} onClick={()=>setTab(n.id)} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,padding:"10px 0 8px",background:"none",border:"none",color:tab===n.id?"#111":"#ccc",fontSize:10,fontWeight:tab===n.id?500:300,letterSpacing:"0.08em" }}>
+              {n.id==="home" && <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 8.5L10 3l7 5.5V17a1 1 0 01-1 1H4a1 1 0 01-1-1V8.5z"/></svg>}
+              {n.id==="bookmark" && <svg width="14" height="16" viewBox="0 0 14 18" fill={tab==="bookmark"?"#111":"none"} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1 1h12v16l-6-4-6 4V1z"/></svg>}
+              {n.id==="settings" && <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="10" cy="10" r="2.5"/><path d="M10 1v2M10 17v2M1 10h2M17 10h2M3.22 3.22l1.42 1.42M15.36 15.36l1.42 1.42M3.22 16.78l1.42-1.42M15.36 4.64l1.42-1.42"/></svg>}
+              {n.label.replace(/ \(\d+\)/,"")}
             </button>
           ))}
-        </div>
+        </nav>
       )}
     </div>
   );
