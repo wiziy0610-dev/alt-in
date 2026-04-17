@@ -64,7 +64,7 @@ const HERO_IMAGE = "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df
 /* ── 필터/중복 제거 ── */
 const BAD = ["관한 기사입니다","본문을 불러오지","링크를 클릭해","원문을 확인","자세한 내용은","기사입니다","확인하세요","없습니다"];
 function cleanSummary(s,t){ if(!s)return[]; return s.filter(x=>x&&x.length>15&&!BAD.some(p=>x.includes(p))&&x.trim()!==t.trim()); }
-function isRecent(d){ if(!d)return true; try{return(Date.now()-new Date(d).getTime())/86400000<=14;}catch{return true;} }
+function isRecent(d){ if(!d)return true; try{return(Date.now()-new Date(d).getTime())/86400000<=30;}catch{return true;} }
 function hasOverlap(a,b){ const c=s=>s.replace(/[^\uAC00-\uD7A3a-zA-Z0-9]/g,""); const sa=c(a),sb=c(b); for(let i=0;i<=sa.length-8;i++)if(sb.includes(sa.slice(i,i+8)))return true; return false; }
 function dedup(arr){ const kept=[]; arr.forEach(a=>{if(!kept.some(k=>hasOverlap(k.title,a.title)))kept.push(a);}); return kept; }
 function groupByCategory(arr){ const r={부동산:[],인프라:[],PE:[],VC:[]}; dedup(arr.filter(a=>isRecent(a.scraped_at))).forEach(item=>{ const cat=(item.category||"").trim(); if(r[cat]!==undefined)r[cat].push(item);else r["부동산"].push(item); }); return r; }
